@@ -1,0 +1,10 @@
+_ > nanoagent.plugin.v0001.ProductConfig:
+tagline: "College Savings Contribution Planner"
+summary: "Solve a reproducible finance scenario using typed data tools and an executable verifier."
+highlights:
+  - "Bundled scenarios; no live financial data or API keys"
+  - "Explicit rounding and independently verified calculations"
+steps:
+  - "Choose a scenario listed in the README"
+  - "Retrieve assumptions using the provided tools"
+  - "Submit the complete structured result"

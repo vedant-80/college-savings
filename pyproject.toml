@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nanoagent-college-savings"
+version = "0.1.0"
+description = "College Savings Contribution Planner: a deterministic NanoAgent task"
+requires-python = ">=3.12"
+dependencies = ["mcp>=1.27,<2", "slimconfig"]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+plugin = ["data/*.json"]
+
+[tool.uv.sources]
+slimconfig = { git = "https://github.com/zeyuyang8/slimconfig", rev = "e61217e96a47b763641d40e9f14efd692de80e47" }
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["E402"]
+"scripts/*.py" = ["E402"]
