@@ -19,7 +19,7 @@ where = ["src"]
 plugin = ["data/*.json"]
 
 [tool.uv.sources]
-slimconfig = { git = "https://github.com/zeyuyang8/slimconfig", rev = "e61217e96a47b763641d40e9f14efd692de80e47" }
+slimconfig = { git = "https://github.com/zeyuyang8/slimconfig", branch = "master" }
 
 [tool.pytest.ini_options]
 pythonpath = [".", "src"]

@@ -20,6 +20,8 @@ For a feasible result, return the minimum allowed contribution and every monthly
 
 ## Tools
 
+Task `plan-college-savings` uses the following tools.
+
 | Tool | Input | Output |
 |---|---|---|
 | `get_college_costs` | scenario_id | Enrollment month, program length, annual tuition and housing, and annual cost increase. |
@@ -49,7 +51,22 @@ For a feasible result, return the minimum allowed contribution and every monthly
 
 Data: `src/plugin/data/scenarios.json`; authoritative rule text: `src/plugin/data/rules.json`. Scenario IDs are dictionary keys, never paths. Tools reread packaged fixtures and do not mutate data or use the workspace. Permission declarations request no network hosts or filesystem writes.
 
-## Reproduce locally
+## Layout
+
+```text
+contract.py             Typed task/tool schemas and registries
+nanoagent.yaml          NanoAgent runtime, permissions, tools, and agent task
+pyproject.toml, uv.lock Standalone package metadata and pinned dependencies
+src/plugin/            MCP server, read-only tools, bundled data, offline sample calculations
+verifier/              Semantic validation and independent financial replay
+tests/                 Verifier tests, validation/example CLIs, and optional runtime integration
+product/, ui/          Catalog metadata, icon, and default host-renderer declaration
+```
+
+Layout and MCP integration follow [arxiv-source at commit 30b5534](https://github.com/zeyuyang8/arxiv-source/tree/30b5534a8ed17f53c3e87d7a092ae20b1e5f6d24). The financial tasks, tools, data, and checks are original implementations. This directory is standalone and does not import either sibling finance plugin or the reference checkout.
+
+
+## Develop and run
 
 Use Python 3.12 or later. From this plugin's directory:
 
@@ -68,7 +85,7 @@ uv run ruff check .
 
 The standard-library test command explicitly skips the integration tests if runtime dependencies are missing. `--require-runtime` fails if any tests are skipped, so a partial run cannot count as complete runtime validation. Integration tests round-trip real slimconfig contracts, call every MCP handler, and launch the actual stdio server with an MCP client.
 
-`uv.lock` inherits the resolved dependency graph and package hashes from the supplied arxiv-source reference, with this project's identity updated and slimconfig pinned to that reference's exact commit. Runtime dependency installation requires network access once; the task itself runs offline afterward. The frozen lock still needs a successful uv sync on a network-enabled machine to confirm installation.
+`uv.lock` inherits the resolved dependency graph and package hashes from the supplied arxiv-source reference, with this project's identity updated. The slimconfig source follows NanoAgent's required `master` branch declaration; `uv.lock` pins the reference's exact commit for frozen installs. Runtime dependency installation requires network access once; the task itself runs offline afterward. The frozen lock still needs a successful uv sync on a network-enabled machine to confirm installation.
 
 To start the server directly after installation:
 
@@ -86,19 +103,6 @@ The verifier accepts either contract dataclass instances (the harness interface)
 
 Checks reject missing/extra fields, changed values, truncated or duplicated rows, incorrect ordering, booleans/floats substituted for integer cents, unknown scenarios, and invalid input bounds. Tool verifiers compare retrieved data to fixtures; task verifiers use independent financial implementations. Tests include hand-calculated cases, all bundled scenarios, negative-output mutations, and 100 deterministically seeded scenario variations per plugin.
 
-## Layout and reference
-
-```text
-contract.py             Typed task/tool schemas and registries
-nanoagent.yaml          NanoAgent runtime, permissions, tools, and agent task
-pyproject.toml, uv.lock Standalone package metadata and pinned dependencies
-src/plugin/            MCP server, read-only tools, bundled data, offline sample calculations
-verifier/              Semantic validation and independent financial replay
-tests/                 Verifier tests, validation/example CLIs, and optional runtime integration
-product/, ui/          Catalog metadata, icon, and default host-renderer declaration
-```
-
-Layout and MCP integration follow [arxiv-source at commit 30b5534](https://github.com/zeyuyang8/arxiv-source/tree/30b5534a8ed17f53c3e87d7a092ae20b1e5f6d24). The financial tasks, tools, data, and checks are original implementations. This directory is standalone and does not import either sibling finance plugin or the reference checkout.
 
 ## Limitations and submission evidence
 

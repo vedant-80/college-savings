@@ -356,7 +356,7 @@ requires-dist = [
     { name = "mcp", specifier = ">=1.27,<2" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
-    { name = "slimconfig", git = "https://github.com/zeyuyang8/slimconfig?rev=e61217e96a47b763641d40e9f14efd692de80e47" },
+    { name = "slimconfig", git = "https://github.com/zeyuyang8/slimconfig?branch=master" },
 ]
 provides-extras = ["dev"]
 
@@ -764,7 +764,7 @@ wheels = [
 [[package]]
 name = "slimconfig"
 version = "0.18.0"
-source = { git = "https://github.com/zeyuyang8/slimconfig?rev=e61217e96a47b763641d40e9f14efd692de80e47#e61217e96a47b763641d40e9f14efd692de80e47" }
+source = { git = "https://github.com/zeyuyang8/slimconfig?branch=master#e61217e96a47b763641d40e9f14efd692de80e47" }
 dependencies = [
     { name = "omegaconf" },
     { name = "pyyaml" },
