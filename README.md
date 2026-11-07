@@ -55,14 +55,14 @@ Use Python 3.12 or later. From this plugin's directory:
 
 ```bash
 # Financial calculations, fixture tools, malformed-output tests, and boundary tests:
-python3 scripts/validate.py
+python3 tests/validate.py
 
 # Sample candidate output plus the independent verifier verdict; no dependencies needed:
-python3 scripts/solve.py five-year-start > /tmp/college-savings-example.json
+python3 tests/solve.py five-year-start > /tmp/college-savings-example.json
 
 # Full typed-contract and MCP integration, after installing uv:
 uv sync --frozen --extra dev
-uv run python scripts/validate.py --require-runtime
+uv run python tests/validate.py --require-runtime
 uv run ruff check .
 ```
 
@@ -76,13 +76,13 @@ To start the server directly after installation:
 NANOAGENT_WORKSPACE=/tmp uv run --frozen python -m plugin
 ```
 
-The server communicates via MCP stdio; it is normally launched by NanoAgent, not used as an interactive terminal program. `scripts/solve.py` is an offline example candidate generator, excluded from the MCP tool list; it is not an agent evaluation run.
+The server communicates via MCP stdio; it is normally launched by NanoAgent, not used as an interactive terminal program. `tests/solve.py` is an offline example candidate generator, excluded from the MCP tool list; it is not an agent evaluation run.
 
 ## Verifier
 
 The verifier independently replays the submitted contribution with Decimal arithmetic and compares every row and summary. For a positive feasible contribution it also replays one cent less and requires failure. With the bundled nonnegative returns, larger contributions cannot reduce balances, so this certifies global minimality. An infeasibility claim is accepted only when the cap fails. The sample solver uses integer arithmetic and binary search.
 
-The verifier accepts either contract dataclass instances (the harness interface) or raw dictionaries (local checks). Public entry points follow the reference: `verify_input(tool, value)`, `verify_output(tool, input_value, output_value, workspace)`, and `verify_task(task, arguments, output, reference, workspace)`. Verdicts contain `valid`, `score`, `message`, and `details`. The task check ignores any supplied reference answer and recomputes from fixtures.
+The verifier accepts either contract dataclass instances (the harness interface) or raw dictionaries (local checks). Public entry points follow the reference: `verify_input(tool, value)`, `verify_output(tool, input_value, output_value, workspace)`, and `verify_task(task, arguments, output, reference, workspace)`. Verdicts contain `valid`, `score`, `message`, and `details`. The task check ignores any supplied reference answer and recomputes from trusted literals in `verifier/fixtures.py`. Tests ensure those literals match the packaged JSON. The verifier imports no MCP implementation code and reads no agent-controlled fixture files.
 
 Checks reject missing/extra fields, changed values, truncated or duplicated rows, incorrect ordering, booleans/floats substituted for integer cents, unknown scenarios, and invalid input bounds. Tool verifiers compare retrieved data to fixtures; task verifiers use independent financial implementations. Tests include hand-calculated cases, all bundled scenarios, negative-output mutations, and 100 deterministically seeded scenario variations per plugin.
 
@@ -94,8 +94,7 @@ nanoagent.yaml          NanoAgent runtime, permissions, tools, and agent task
 pyproject.toml, uv.lock Standalone package metadata and pinned dependencies
 src/plugin/            MCP server, read-only tools, bundled data, offline sample calculations
 verifier/              Semantic validation and independent financial replay
-tests/                 Standard-library tests plus optional real runtime integration
-scripts/               Local validation and demonstration CLI
+tests/                 Verifier tests, validation/example CLIs, and optional runtime integration
 product/, ui/          Catalog metadata, icon, and default host-renderer declaration
 ```
 

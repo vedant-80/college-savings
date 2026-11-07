@@ -1,9 +1,7 @@
 """Deterministic checks; no model calls, tool-output trust, or reference-answer dependence."""
 from dataclasses import asdict, is_dataclass
 from functools import partial
-from types import SimpleNamespace
-from plugin.data import scenario
-from plugin.tools import IMPLEMENTATIONS
+from .fixtures import scenario, tool_output
 from .oracle import check_result, validate_arguments
 
 TOOL_NAMES = ['get_college_costs', 'get_savings_account', 'get_scholarships', 'get_rules']
@@ -56,7 +54,7 @@ def verify_output(tool, input_value, output_value, workspace):
     if not check['valid']:
         return check
     try:
-        wanted = IMPLEMENTATIONS[tool_name(tool)](plain(input_value), None)
+        wanted = tool_output(tool_name(tool), plain(input_value))
         valid = same(plain(output_value), wanted)
         return verdict(valid, 'Tool output matches fixture' if valid else 'Tool output differs from fixture')
     except (ValueError, KeyError, TypeError, AttributeError):
@@ -75,7 +73,18 @@ def verify_task(task, arguments, output, reference, workspace):
     except (ValueError, KeyError, TypeError, AttributeError, OverflowError):
         return verdict(False, 'Missing, malformed, or invalid task input/output')
 
-# Tool/task dispatch remains available through the public functions above.
-TOOLS = {name: SimpleNamespace(verify_input=partial(verify_input, name),
-                               verify_output=partial(verify_output, name)) for name in TOOL_NAMES}
+class ToolVerifier:
+    """Bind the reference module interface without importing types.SimpleNamespace."""
+
+    def __init__(self, name):
+        self.name = name
+
+    def verify_input(self, value):
+        return verify_input(self.name, value)
+
+    def verify_output(self, input_value, output_value, workspace):
+        return verify_output(self.name, input_value, output_value, workspace)
+
+
+TOOLS = {name: ToolVerifier(name) for name in TOOL_NAMES}
 TASKS = {TASK_NAME: partial(verify_task, TASK_NAME)}
