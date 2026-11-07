@@ -1,10 +1,11 @@
 _ > nanoagent.plugin.v0001.ProductConfig:
-tagline: "College Savings Contribution Planner"
-summary: "Solve a reproducible finance scenario using typed data tools and an executable verifier."
+tagline: College Savings Calculator
+summary: Find the minimum monthly saving needed for your college costs, with explicit assumptions and a separate budget check.
 highlights:
-  - "Bundled scenarios; no live financial data or API keys"
-  - "Explicit rounding and independently verified calculations"
+  - "Custom savings, enrollment timing, annual cost, and college duration"
+  - "5% return and 4% cost inflation defaults, both overridable"
+  - "One Python calculation, checked by an independent deterministic verifier"
 steps:
-  - "Choose a scenario listed in the README"
-  - "Retrieve assumptions using the provided tools"
-  - "Submit the complete structured result"
+  - "Describe your situation and provide missing essential values"
+  - "Review rate assumptions and optionally provide a monthly budget"
+  - "Get the minimum contribution or immediate-enrollment funding gap"

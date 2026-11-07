@@ -1,7 +1,7 @@
 _ > nanoagent.plugin.v0001.ManifestConfig:
 id: college-savings
-name: College Savings Contribution Planner
-version: 0.1.0
+name: College Savings Calculator
+version: 0.2.0
 status: ready
 spec: nanoagent.plugin/v0001
 
@@ -16,20 +16,13 @@ permissions > nanoagent.plugin.v0001.PermissionsConfig:
     write: []
 
 tools > dict[contract.Tool, nanoagent.plugin.v0001.ToolConfig]:
-  get_college_costs:
-    description: Retrieve enrollment timing, program length and annual tuition and housing assumptions
-  get_savings_account:
-    description: Retrieve existing savings, monthly return and allowed contribution cap
-  get_scholarships:
-    description: Retrieve scholarship amounts and disbursement months
-  get_rules:
-    description: Retrieve event order, cost escalation, rounding and minimum contribution rules
+  calculate_college_savings:
+    description: Calculate the minimum monthly college savings contribution using custom inputs, not a scenario. Ask for months until enrollment, savings, annual college cost in today's money, and years of college if missing; never invent personal facts. Pass null for unspecified rate assumptions or no monthly budget. Python calculates all months; do not project or search manually.
 
 tasks > dict[contract.Task, nanoagent.plugin.v0001.TaskConfig]:
   plan-college-savings:
-    description: College Savings Contribution Planner
-    runner: agent
-    tools: [get_college_costs, get_savings_account, get_scholarships, get_rules]
+    description: Calculate the minimum monthly college savings contribution using custom inputs, not a scenario. Ask for months until enrollment, savings, annual college cost in today's money, and years of college if missing; never invent personal facts. Pass null for unspecified rate assumptions or no monthly budget. Python calculates all months; do not project or search manually.
+    runner: tool
+    tools: [calculate_college_savings]
     reference: null
-    instructions: |-
-      Retrieve all scenario data and rules. Find the minimum allowed fixed monthly contribution that pays every expense on time, or demonstrate infeasibility at the contribution cap. Submit the full monthly projection through the horizon or first shortfall. A scholarship received after a due expense cannot repair an earlier shortfall. See CollegeOutput for required fields.
+    instructions: Calculate the true minimum contribution independently of the optional budget. Default nominal return is 5% and college-cost inflation 4%. N months until enrollment permits N deposits; contributions stop after the deposit immediately before the first bill. Return a compact independently verified summary with no monthly schedule. For enrollment today, report the minimum additional upfront savings if needed.

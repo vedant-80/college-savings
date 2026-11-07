@@ -1,1 +1,1 @@
-"""Offline finance scenario tools."""
+"""Custom-input deterministic college savings calculator."""

@@ -1,111 +1,67 @@
-# College Savings Contribution Planner
+# College Savings Calculator
 
-Find the smallest fixed monthly contribution, in cents and within a supplied cap, that pays a college expense schedule on time. Account for existing savings, fixed monthly growth, annual tuition/housing increases, and dated scholarships.
-
-Task ID: `plan-college-savings`. Runner: `agent`. Each monetary value is an integer number of cents; a basis point is 1/100 of a percentage point. No tool solves the task or calls an LLM. All scenarios are synthetic, bundled JSON fixtures, not live financial data.
-
-## Task input and output
-
-Example task input:
-
-```json
-{
-  "scenario_id": "five-year-start"
-}
-```
-
-The complete typed output is `CollegeOutput` in `contract.py`; nested row types also live there. All fields and rows are required. Month/year indices start at 1. Only the scenario IDs listed below are accepted. Arbitrary financial inputs are deliberately outside this task's scope.
-
-For a feasible result, return the minimum allowed contribution and every monthly row through the final academic year. If no contribution up to the cap works, submit the cap and its projection through the first negative closing balance. first_shortfall_month=0 means no failure.
+Find the minimum fixed monthly contribution that funds all college bills using your own savings, enrollment timing, costs, and duration. The host chat collects missing essentials and translates the description into typed inputs. The task runs one deterministic Python tool without an inner LLM loop or model-generated monthly schedules. No LLM is used in verification.
 
 ## Tools
 
-Task `plan-college-savings` uses the following tools.
+Task `plan-college-savings` directly calls `calculate_college_savings`; both share `CollegeInput` and `CollegeOutput` in `contract.py`. Money is integer cents in one currency. Rates are integer basis points (100 bps = 1%). Ask for months until enrollment, current savings, annual all-in cost in today's money, and number of college years if missing. Do not guess personal facts.
 
-| Tool | Input | Output |
-|---|---|---|
-| `get_college_costs` | scenario_id | Enrollment month, program length, annual tuition and housing, and annual cost increase. |
-| `get_savings_account` | scenario_id | Initial savings, fixed monthly return in basis points, and allowed monthly contribution cap. |
-| `get_scholarships` | scenario_id | All award amounts and disbursement months. |
-| `get_rules` | none | Contribution timing, expense timing, growth, rounding, horizon, and infeasibility rules. |
+Every machine-input key is required, including nullable fields: pass null for a default rate or no monthly budget. Zero is an explicit value. Example: a child enrolls in eight years, savings are $15,000, and college currently costs $30,000 a year for four years:
 
-## Exact financial rules
+```json
+{
+  "months_until_enrollment": 96,
+  "current_savings_cents": 1500000,
+  "annual_college_cost_cents": 3000000,
+  "college_years": 4,
+  "investment_return_bps": null,
+  "cost_inflation_bps": null,
+  "monthly_budget_cents": 100000
+}
+```
 
-1. Money is integer cents. Months are 1-based. monthly_return_bps is a fixed MONTHLY return, not an annual rate.
-2. Year 1 costs are annual_tuition_cents plus annual_housing_cents. Each subsequent academic year multiplies each prior component by 1 + annual_cost_increase_bps/10000, rounding each component to cents, ties up.
-3. Pay each academic year costs in full at enrollment_month + 12 * academic_year_index. Horizon ends at enrollment_month + 12 * program_years - 1.
-4. Each month: apply growth to opening savings (round to cents, ties up), add the fixed monthly contribution if month < enrollment_month, add scholarships, then pay expenses.
-5. Find the smallest nonnegative whole-cent monthly contribution at or below max_monthly_contribution_cents that never makes savings negative.
-6. If no allowed contribution works, feasible=false and monthly_contribution_cents must equal the cap. Return its projection through its first shortfall.
-7. If feasible, return the full projection through the horizon with first_shortfall_month=0. A failed projection stops at the first negative closing balance. No borrowing or taxes are modeled.
+## Financial rules
 
-## Bundled scenarios
+- Default nominal annual investment return: 500 bps (5%). Default annual college-cost inflation: 400 bps (4%). Both can be overridden. Effective inputs and defaulted rate names are returned.
+- Use integer months from today. Enrollment N months away permits exactly N deposits, at the ends of months 1 through N. Contributions stop after the last deposit immediately before the first college bill. Enrollment today means no deposits and an immediate bill at month 0.
+- Each month first apply investment growth to the opening balance (annual nominal rate divided by 12), then deposit if still in the saving window, then pay any annual bill. Each growth amount is rounded separately to cents, nearest with ties away from zero. New deposits first earn returns the following month.
+- College costs inflate at each 12-month anniversary from today, with each annual increase rounded separately to cents. There is no fractional-year cost inflation. At enrollment N, the first bill has floor(N/12) annual inflation increases; further bills occur at N+12, N+24, etc. At an anniversary, cost inflation occurs before that month's bill.
+- Savings continue earning returns during college. Annual bills are paid at the beginning of each academic year. Projection ends immediately after the last annual bill, not at the end of the final academic year. A negative balance at any bill means failure; later gains cannot repair a missed bill.
+- Search the true minimum whole-cent monthly contribution independently of an optional monthly budget. The budget does not cap the search. Report whether the minimum fits and how much it exceeds the budget. Without a budget those fields remain null.
+- If enrollment is immediate and current savings cannot cover every bill, the minimum monthly contribution is null, status is upfront_funding_gap, and the result gives the minimum additional savings needed today to fund every bill. Its first shortfall can be month 0 or a later academic year. Budget fit is false when a budget was supplied; no monthly shortfall amount is fabricated.
+- Zero contributions are valid when current savings already fund all bills. Projected enrollment savings are measured before the first bill; total cost is the sum of all future bills, not a present value. A successful result includes the remaining balance after the last bill. That balance is null for an upfront funding gap; adding the stated upfront gap would fund all bills.
 
-- `five-year-start`
-- `already-funded`
-- `zero-growth`
-- `immediate-shortfall`
-- `scholarship-funded`
-- `cap-insufficient`
-- `late-scholarship`
+Input bounds: months until enrollment 0–360, college years 1–10, monetary inputs 0–10^15 cents, nominal annual investment return −10000 to 10000 bps, cost inflation 0–10000 bps. These bounds keep projections and independent verification finite (at most 468 months). Optional budget is either null or a monetary input. Rate defaults are modeling assumptions, not forecasts or guarantees.
 
-Data: `src/plugin/data/scenarios.json`; authoritative rule text: `src/plugin/data/rules.json`. Scenario IDs are dictionary keys, never paths. Tools reread packaged fixtures and do not mutate data or use the workspace. Permission declarations request no network hosts or filesystem writes.
+Out of scope: scholarships, loans, taxes, contribution limits or incentives, fees beyond the supplied return, investment volatility, currency conversion, and deposits during college. Include every desired expense in the annual cost input.
+
+## Verification
+
+The calculator uses integer arithmetic and bounded binary search. The verifier separately validates inputs and replays the proposed contribution using Decimal arithmetic. It requires every bill to be funded and, for a positive contribution, requires one cent less per month to fail. This proves minimality because balances are monotone in the contribution under the supported rates and rounding rules. Immediate-enrollment upfront gaps receive the analogous one-cent certificate on additional initial savings. The verifier also checks all summaries, assumptions, defaults, and budget results exactly; no calculator imports, model calls, or workspace files are trusted. It does not verify whether chat correctly interpreted an ambiguous description.
 
 ## Layout
 
-```text
-contract.py             Typed task/tool schemas and registries
-nanoagent.yaml          NanoAgent runtime, permissions, tools, and agent task
-pyproject.toml, uv.lock Standalone package metadata and pinned dependencies
-src/plugin/            MCP server, read-only tools, bundled data, offline sample calculations
-verifier/              Semantic validation and independent financial replay
-tests/                 Verifier tests, validation/example CLIs, and optional runtime integration
-product/, ui/          Catalog metadata, icon, and default host-renderer declaration
-```
-
-Layout and MCP integration follow [arxiv-source at commit 30b5534](https://github.com/zeyuyang8/arxiv-source/tree/30b5534a8ed17f53c3e87d7a092ae20b1e5f6d24). The financial tasks, tools, data, and checks are original implementations. This directory is standalone and does not import either sibling finance plugin or the reference checkout.
-
+`contract.py` holds the typed task/tool. `nanoagent.yaml` selects runner: tool. `src/plugin/` contains the calculator and MCP server. `verifier/` contains independent replay and comparison. `tests/` contains examples, hand-calculated financial boundaries, minimality and budget regressions, randomized replay, and real typed/MCP integration. `product/` and `ui/` supply catalog metadata and the standard host output view.
 
 ## Develop and run
 
-Use Python 3.12 or later. From this plugin's directory:
+Use Python 3.12+:
 
 ```bash
-# Financial calculations, fixture tools, malformed-output tests, and boundary tests:
 python3 tests/validate.py
-
-# Sample candidate output plus the independent verifier verdict; no dependencies needed:
-python3 tests/solve.py five-year-start > /tmp/college-savings-example.json
-
-# Full typed-contract and MCP integration, after installing uv:
 uv sync --frozen --extra dev
 uv run python tests/validate.py --require-runtime
 uv run ruff check .
+# With NanoAgent installed:
+nanoagent plugin inspect .
 ```
 
-The standard-library test command explicitly skips the integration tests if runtime dependencies are missing. `--require-runtime` fails if any tests are skipped, so a partial run cannot count as complete runtime validation. Integration tests round-trip real slimconfig contracts, call every MCP handler, and launch the actual stdio server with an MCP client.
-
-`uv.lock` inherits the resolved dependency graph and package hashes from the supplied arxiv-source reference, with this project's identity updated. The slimconfig source follows NanoAgent's required `master` branch declaration; `uv.lock` pins the reference's exact commit for frozen installs. Runtime dependency installation requires network access once; the task itself runs offline afterward. The frozen lock still needs a successful uv sync on a network-enabled machine to confirm installation.
-
-To start the server directly after installation:
+The dependency-free run skips runtime integration if dependencies are absent. `--require-runtime` fails if any test is skipped. Try the editable custom example directly:
 
 ```bash
-NANOAGENT_WORKSPACE=/tmp uv run --frozen python -m plugin
+PYTHONPATH=src python3 -c 'import json; from plugin.calculations import solve; print(json.dumps(solve(json.load(open("tests/example.json"))), indent=2))'
 ```
 
-The server communicates via MCP stdio; it is normally launched by NanoAgent, not used as an interactive terminal program. `tests/solve.py` is an offline example candidate generator, excluded from the MCP tool list; it is not an agent evaluation run.
+After installation, the MCP server starts with `NANOAGENT_WORKSPACE=/tmp uv run --frozen python -m plugin`. It requests no network or filesystem write permissions. Invalid inputs receive clear MCP errors. Layout follows arxiv-source at commit 30b5534 and NanoAgent v0001; the required slimconfig master source is pinned to a resolved commit in uv.lock.
 
-## Verifier
-
-The verifier independently replays the submitted contribution with Decimal arithmetic and compares every row and summary. For a positive feasible contribution it also replays one cent less and requires failure. With the bundled nonnegative returns, larger contributions cannot reduce balances, so this certifies global minimality. An infeasibility claim is accepted only when the cap fails. The sample solver uses integer arithmetic and binary search.
-
-The verifier accepts either contract dataclass instances (the harness interface) or raw dictionaries (local checks). Public entry points follow the reference: `verify_input(tool, value)`, `verify_output(tool, input_value, output_value, workspace)`, and `verify_task(task, arguments, output, reference, workspace)`. Verdicts contain `valid`, `score`, `message`, and `details`. The task check ignores any supplied reference answer and recomputes from trusted literals in `verifier/fixtures.py`. Tests ensure those literals match the packaged JSON. The verifier imports no MCP implementation code and reads no agent-controlled fixture files.
-
-Checks reject missing/extra fields, changed values, truncated or duplicated rows, incorrect ordering, booleans/floats substituted for integer cents, unknown scenarios, and invalid input bounds. Tool verifiers compare retrieved data to fixtures; task verifiers use independent financial implementations. Tests include hand-calculated cases, all bundled scenarios, negative-output mutations, and 100 deterministically seeded scenario variations per plugin.
-
-
-## Limitations and submission evidence
-
-Fixed nonnegative monthly return assumptions; no market uncertainty, taxes, 529-specific rules, loans, contribution changes, or financial-aid eligibility calculations. Expenses are paid annually at the start of each academic year. Contributions stop at enrollment. The cap is part of the task, so infeasible means infeasible within that cap.
-
-These scenarios demonstrate calculations under stated assumptions and are not personalized financial advice. No RUSH Lab publication or live agent run is claimed. Collect actual task inputs, validation logs, and verifier verdicts outside this repository for the assignment PDF; the example command above writes to `/tmp` for that reason. A passing sample solver run demonstrates the verifier path, not that an agent successfully completed the task.
+Version 0.2.0 replaces the scenario-ID API, scholarship fixtures, and full monthly schedules. Collect actual inputs, live logs, and verdict evidence outside this repository for the assignment PDF. Local validation is not a claim of marketplace publication or a successful live chat run.
